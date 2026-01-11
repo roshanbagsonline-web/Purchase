@@ -40,7 +40,6 @@
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Header & Controls */
         .glass-header {
             background: var(--surface);
             border-radius: 24px;
@@ -69,7 +68,6 @@
 
         .form-select:focus { border-color: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
 
-        /* Stat Cards */
         .stat-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -88,10 +86,8 @@
         .stat-label { font-size: 0.7rem; font-weight: 800; color: var(--text-sub); text-transform: uppercase; letter-spacing: 1.2px; }
         .stat-value { font-size: 2rem; font-weight: 800; font-family: 'Plus Jakarta Sans'; color: var(--brand); margin: 0.2rem 0; }
         
-        /* INCREASED AMOUNT TEXT SIZE (CARDS) */
         #bagsTotal, #luggageTotal { font-size: 1.4rem; letter-spacing: -0.5px; }
 
-        /* Footer Total */
         .revenue-section {
             background: #0f172a;
             color: white;
@@ -102,42 +98,41 @@
             margin-bottom: 2rem;
         }
 
-        /* Detailed Table */
         .table-wrapper {
             background: var(--surface);
             border-radius: 20px;
             overflow: hidden;
             box-shadow: var(--shadow);
-            display: none; 
         }
 
         .table-custom { width: 100%; border-collapse: collapse; }
         .table-custom th { background: #f8fafc; padding: 1rem; font-size: 0.7rem; color: var(--text-sub); text-transform: uppercase; border-bottom: 1px solid #e2e8f0; }
         .table-custom td { padding: 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
 
-        /* INCREASED AMOUNT TEXT SIZE (TABLE) */
         .table-amount-cell { font-size: 1.15rem !important; }
 
-        /* Subtotal Styling */
-        .day-summary-row { background: #fcfcfc !important; border-bottom: 2px solid #e2e8f0; }
+        .day-summary-row { background: #fcfcfc !important; }
         .subtotal-pill {
             display: inline-flex;
             align-items: center;
-            padding: 6px 14px; /* Slightly larger padding */
+            padding: 6px 14px;
             border-radius: 10px;
-            font-size: 1rem; /* INCREASED AMOUNT TEXT SIZE (PILLS) */
+            font-size: 0.95rem;
             font-weight: 800;
             margin-left: 8px;
         }
         .pill-bags { background: var(--brand-soft); color: var(--brand); }
         .pill-lugg { background: var(--warning-bg); color: var(--warning-text); }
-        .pill-total { background: var(--text-main); color: #fff; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+        .pill-total { background: var(--text-main); color: #fff; border-radius: 8px; }
 
-        /* Mobile Adjustments */
+        .product-details-rows table tr td {
+            border-bottom: 1px solid #f8fafc;
+        }
+
         @media (max-width: 600px) {
             .control-grid { grid-template-columns: 1fr; }
             .revenue-section { padding: 1.5rem; }
-            .subtotal-pill { margin-top: 8px; width: 100%; justify-content: space-between; }
+            .subtotal-pill { margin-top: 8px; width: 100%; justify-content: space-between; margin-left: 0; }
         }
 
         #loader-overlay {
@@ -165,7 +160,7 @@
             <select id="datePreset" class="form-select" onchange="handlePresetChange()">
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>
-                <option value="last7">Last 7 Days</option>
+                <option value="last7" selected>Last 7 Days</option>
                 <option value="thisMonth">This Month</option>
                 <option value="custom">Custom Range</option>
             </select>
@@ -204,12 +199,12 @@
     </div>
 
     <div id="detailsSection" class="table-wrapper">
-        <table class="table-custom">
+        <table class="table-custom" id="mainTable">
             <thead>
                 <tr>
                     <th style="width: 25%">Date</th>
-                    <th style="width: 50%">Product</th>
-                    <th style="width: 25%" class="text-end">Amount</th>
+                    <th style="width: 50%">Product Summary</th>
+                    <th style="width: 25%" class="text-end">Daily Total</th>
                 </tr>
             </thead>
             <tbody id="productTableBody"></tbody>
@@ -265,7 +260,9 @@
             start = new Date(s); end = new Date(e);
         }
 
-        document.getElementById('rangeLabel').innerText = `${start.toLocaleDateString('en-GB', {day:'2-digit', month:'short'})} - ${end.toLocaleDateString('en-GB', {day:'2-digit', month:'short'})}`;
+        // UPDATED: Now shows day, month name, and full year
+        const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+        document.getElementById('rangeLabel').innerText = `${start.toLocaleDateString('en-GB', dateOptions)} - ${end.toLocaleDateString('en-GB', dateOptions)}`;
 
         const filtered = allOrders.filter(o => {
             const d = new Date(o.orderDate);
@@ -279,14 +276,22 @@
         let globalBagsAmt = 0, globalBagsQty = 0, globalLuggAmt = 0, globalLuggQty = 0;
         let tableHTML = "";
         let dayBags = 0, dayLugg = 0, lastDate = null;
+        let dayProductsHTML = ""; 
 
-        const addSummary = (date, b, l) => `
-            <tr class="day-summary-row">
-                <td colspan="3" class="text-end py-3">
+        const createDayBlock = (date, b, l, products) => `
+            <tr class="day-summary-row border-bottom">
+                <td colspan="3" class="text-end py-3 px-3">
                     <span class="float-start small fw-bold text-muted mt-2">${date}</span>
                     <span class="subtotal-pill pill-bags">Bags: ₹${b.toLocaleString('en-IN')}</span>
                     <span class="subtotal-pill pill-lugg">Lugg: ₹${l.toLocaleString('en-IN')}</span>
                     <span class="subtotal-pill pill-total">TOTAL: ₹${(b+l).toLocaleString('en-IN')}</span>
+                </td>
+            </tr>
+            <tr class="product-details-rows" style="display: ${document.getElementById('showDetails').checked ? 'table-row' : 'none'}">
+                <td colspan="3" class="p-0 border-bottom">
+                    <table class="w-100 mb-0">
+                        ${products}
+                    </table>
                 </td>
             </tr>`;
 
@@ -296,22 +301,22 @@
             const dateStr = new Date(order.orderDate).toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
 
             if (lastDate && lastDate !== dateStr) {
-                tableHTML += addSummary(lastDate, dayBags, dayLugg);
-                dayBags = 0; dayLugg = 0;
+                tableHTML += createDayBlock(lastDate, dayBags, dayLugg, dayProductsHTML);
+                dayBags = 0; dayLugg = 0; dayProductsHTML = "";
             }
 
             if (isBag) { globalBagsAmt += price; globalBagsQty++; dayBags += price; }
             else { globalLuggAmt += price; globalLuggQty++; dayLugg += price; }
 
-            tableHTML += `
-                <tr>
-                    <td class="small text-muted">${dateStr}</td>
-                    <td><div class="fw-semibold small">${order.productName}</div></td>
-                    <td class="text-end fw-bold table-amount-cell">₹${price.toLocaleString('en-IN')}</td>
+            dayProductsHTML += `
+                <tr style="background: #fff">
+                    <td style="width: 25%" class="ps-3 small text-muted py-2">${dateStr}</td>
+                    <td style="width: 50%" class="py-2"><div class="fw-semibold small">${order.productName}</div></td>
+                    <td style="width: 25%" class="text-end pe-3 fw-bold table-amount-cell py-2">₹${price.toLocaleString('en-IN')}</td>
                 </tr>`;
             
             lastDate = dateStr;
-            if (index === orders.length - 1) tableHTML += addSummary(lastDate, dayBags, dayLugg);
+            if (index === orders.length - 1) tableHTML += createDayBlock(lastDate, dayBags, dayLugg, dayProductsHTML);
         });
 
         requestAnimationFrame(() => {
@@ -328,7 +333,11 @@
     }
 
     function toggleDetails() {
-        document.getElementById('detailsSection').style.display = document.getElementById('showDetails').checked ? "block" : "none";
+        const isVisible = document.getElementById('showDetails').checked;
+        const detailRows = document.querySelectorAll('.product-details-rows');
+        detailRows.forEach(row => {
+            row.style.display = isVisible ? "table-row" : "none";
+        });
     }
 
     function numberToWords(num) {
